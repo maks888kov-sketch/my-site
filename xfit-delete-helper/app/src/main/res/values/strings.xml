@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Помощник XFIT</string>
+    <string name="accessibility_description">Показывает кнопку удаления только на экране записи XFIT STAFF и нажимает корзину после подтверждения.</string>
+</resources>
