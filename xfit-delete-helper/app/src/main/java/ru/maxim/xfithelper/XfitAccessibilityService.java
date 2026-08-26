@@ -46,8 +46,10 @@ public class XfitAccessibilityService extends AccessibilityService {
         if (root == null) { hideOverlay(); return; }
         CharSequence pkg = root.getPackageName();
         boolean xfit = pkg != null && "ru.xfit.staff".contentEquals(pkg);
-        boolean detail = xfit && (hasText(root, "Записать на тренировку") || hasText(root, "Сохранить"));
-        if (detail) showOverlay(); else hideOverlay();
+        // Some XFIT builds do not expose the Flutter screen text to Android's
+        // accessibility tree. Show the helper on every XFIT screen instead of
+        // relying on a title that may be invisible to the service.
+        if (xfit) showOverlay(); else hideOverlay();
         if (deleteRequested && xfit) handler.postDelayed(this::clickTrash, 250);
     }
 
@@ -73,9 +75,9 @@ public class XfitAccessibilityService extends AccessibilityService {
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT);
-        p.gravity = Gravity.TOP | Gravity.END;
-        p.x = 20;
-        p.y = Math.round(250 * getResources().getDisplayMetrics().density);
+        p.gravity = Gravity.BOTTOM | Gravity.START;
+        p.x = Math.round(18 * getResources().getDisplayMetrics().density);
+        p.y = Math.round(120 * getResources().getDisplayMetrics().density);
         windowManager.addView(overlayButton, p);
     }
 
