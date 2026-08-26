@@ -15,6 +15,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Button;
 import android.widget.Toast;
+import android.content.SharedPreferences;
 import java.util.List;
 
 public class XfitAccessibilityService extends AccessibilityService {
@@ -23,6 +24,7 @@ public class XfitAccessibilityService extends AccessibilityService {
     private WindowManager windowManager;
     private Button overlayButton;
     private boolean deleteRequested;
+    private long lastAutoAction;
 
     @Override public void onServiceConnected() {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
@@ -51,6 +53,47 @@ public class XfitAccessibilityService extends AccessibilityService {
         // relying on a title that may be invisible to the service.
         if (xfit) showOverlay(); else hideOverlay();
         if (deleteRequested && xfit) handler.postDelayed(this::clickTrash, 250);
+        if (xfit && getSharedPreferences("transfer", MODE_PRIVATE)
+                .getBoolean("open_client_pending", false)) {
+            handler.postDelayed(this::openTransferClient, 500);
+        }
+    }
+
+    private void openTransferClient() {
+        if (System.currentTimeMillis() - lastAutoAction < 900) return;
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null || root.getPackageName() == null || !"ru.xfit.staff".contentEquals(root.getPackageName())) return;
+
+        if (hasText(root, "Записать на тренировку")) {
+            SharedPreferences prefs = getSharedPreferences("transfer", MODE_PRIVATE);
+            prefs.edit().putBoolean("open_client_pending", false).apply();
+            Toast.makeText(this, "Запись открыта. Выберите " + prefs.getString("target_date", "дату")
+                + " в " + prefs.getString("target_time", "нужное время")
+                + " и сами подтвердите сохранение.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        String clientName = getSharedPreferences("transfer", MODE_PRIVATE).getString("client_name", "");
+        if (clientName.isEmpty()) return;
+        AccessibilityNodeInfo client = findTextNode(root, clientName);
+        if (client != null && clickNodeOrParent(client)) { lastAutoAction = System.currentTimeMillis(); return; }
+
+        AccessibilityNodeInfo schedule = findTextNode(root, "Расписание");
+        if (schedule != null && clickNodeOrParent(schedule)) { lastAutoAction = System.currentTimeMillis(); return; }
+
+        AccessibilityNodeInfo more = findTextNode(root, "Ещё");
+        if (more != null && clickNodeOrParent(more)) lastAutoAction = System.currentTimeMillis();
+    }
+
+    private AccessibilityNodeInfo findTextNode(AccessibilityNodeInfo root, String text) {
+        List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(text);
+        return nodes == null || nodes.isEmpty() ? null : nodes.get(0);
+    }
+
+    private boolean clickNodeOrParent(AccessibilityNodeInfo node) {
+        AccessibilityNodeInfo clickable = node;
+        while (clickable != null && !clickable.isClickable()) clickable = clickable.getParent();
+        return clickable != null && clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK);
     }
 
     private boolean hasText(AccessibilityNodeInfo root, String text) {
